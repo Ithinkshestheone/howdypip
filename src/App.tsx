@@ -37,6 +37,8 @@ import {
   X,
   Signal,
   Activity as ActivityIcon,
+  Search,
+  Star,
 } from 'lucide-react';
 
 type Tab = 'STAT' | 'INV' | 'DATA' | 'MAP' | 'RADIO';
@@ -516,6 +518,8 @@ const RadioView: React.FC = () => {
   const [volume, setVolume] = useState(0.5);
   const [showVolumeIndicator, setShowVolumeIndicator] = useState(false);
   const [activeStation, setActiveStation] = useState('Diamond City Radio');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState<string[]>(['Diamond City Radio']);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const volumeTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -545,6 +549,26 @@ const RadioView: React.FC = () => {
       strength: 60
     },
   ];
+
+  const toggleFavorite = (name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFavorites(prev => 
+      prev.includes(name) ? prev.filter(f => f !== name) : [...prev, name]
+    );
+  };
+
+  const filteredStations = stations
+    .filter(s => 
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      s.freq.includes(searchQuery)
+    )
+    .sort((a, b) => {
+      const aFav = favorites.includes(a.name);
+      const bFav = favorites.includes(b.name);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return 0;
+    });
 
   const currentStation = stations.find(s => s.name === activeStation);
 
@@ -598,45 +622,78 @@ const RadioView: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Search Bar */}
+      <div className="relative group">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pip-green/50 group-focus-within:text-pip-green transition-colors" />
+        <input 
+          type="text"
+          placeholder="SEARCH FREQUENCY OR NAME..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-pip-green/5 border border-pip-green/20 focus:border-pip-green focus:bg-pip-green/10 outline-none py-2 pl-10 pr-4 text-xs font-bold uppercase tracking-widest transition-all placeholder:text-pip-green/30"
+        />
+        {searchQuery && (
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-pip-green/50"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
       
       <div className="flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar">
-        {stations.map((s) => (
-          <div 
-            key={s.name} 
-            onClick={() => {
-              setActiveStation(s.name);
-              setIsPlaying(true);
-            }}
-            className={`flex justify-between items-center p-4 border transition-all cursor-pointer relative overflow-hidden ${
-              activeStation === s.name ? 'bg-pip-green text-pip-bg border-pip-green' : 'border-pip-green/20 hover:border-pip-green/50'
-            }`}
-          >
-            {activeStation === s.name && isPlaying && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0.1, 0.3, 0.1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="absolute inset-0 bg-white/10 pointer-events-none"
-              />
-            )}
-            <div className="flex items-center gap-3 z-10">
-              <RadioIcon size={20} className={activeStation === s.name && isPlaying ? 'animate-pulse' : ''} />
-              <div className="flex flex-col">
-                <span className="font-bold uppercase">{s.name}</span>
-                <div className="flex items-center gap-2 text-[10px] opacity-70">
-                  <Signal size={10} />
-                  <span>SIGNAL: {s.strength}%</span>
+        {filteredStations.length > 0 ? (
+          filteredStations.map((s) => (
+            <div 
+              key={s.name} 
+              onClick={() => {
+                setActiveStation(s.name);
+                setIsPlaying(true);
+              }}
+              className={`flex justify-between items-center p-4 border transition-all cursor-pointer relative overflow-hidden ${
+                activeStation === s.name ? 'bg-pip-green text-pip-bg border-pip-green' : 'border-pip-green/20 hover:border-pip-green/50'
+              }`}
+            >
+              {activeStation === s.name && isPlaying && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0.1, 0.3, 0.1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="absolute inset-0 bg-white/10 pointer-events-none"
+                />
+              )}
+              <div className="flex items-center gap-3 z-10">
+                <button 
+                  onClick={(e) => toggleFavorite(s.name, e)}
+                  className={`transition-colors ${favorites.includes(s.name) ? 'text-pip-bg' : 'text-pip-green/40 hover:text-pip-green'}`}
+                >
+                  <Star size={16} fill={favorites.includes(s.name) ? "currentColor" : "none"} />
+                </button>
+                <RadioIcon size={20} className={activeStation === s.name && isPlaying ? 'animate-pulse' : ''} />
+                <div className="flex flex-col">
+                  <span className="font-bold uppercase">{s.name}</span>
+                  <div className="flex items-center gap-2 text-[10px] opacity-70">
+                    <Signal size={10} />
+                    <span>SIGNAL: {s.strength}%</span>
+                  </div>
                 </div>
               </div>
+              <div className="flex flex-col items-end z-10">
+                <span className="text-sm font-bold">{s.freq} FM</span>
+                {activeStation === s.name && isPlaying && (
+                  <span className="text-[8px] animate-pulse">TUNED IN</span>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col items-end z-10">
-              <span className="text-sm font-bold">{s.freq} FM</span>
-              {activeStation === s.name && isPlaying && (
-                <span className="text-[8px] animate-pulse">TUNED IN</span>
-              )}
-            </div>
+          ))
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center opacity-30 gap-2 italic">
+            <Signal size={48} className="animate-pulse" />
+            <span className="text-sm uppercase font-bold tracking-widest">No Signal Found</span>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Audio Controls */}
